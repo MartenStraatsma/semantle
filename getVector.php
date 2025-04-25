@@ -5,7 +5,7 @@ try {
     $connect = new PDO(
         "mysql:charset=utf8mb4;host=localhost;dbname=strmtjs_semantle",
         "strmtjs_admin",
-        "iNW%tna6Eghb8r6pk^80"
+        ""
     );
 } catch (PDOException $e) {
     exit($e->getMessage());
