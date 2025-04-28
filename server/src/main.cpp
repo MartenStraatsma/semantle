@@ -19,6 +19,7 @@
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
 #include <boost/asio.hpp>
+#include <boost/url/decode_view.hpp>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
@@ -26,6 +27,9 @@
 #include <list>
 #include <memory>
 #include <string>
+
+#include <fasttext/real.h>
+#include <fasttext/fasttext.h>
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
@@ -38,9 +42,9 @@ public:
     http_worker(http_worker const&) = delete;
     http_worker& operator=(http_worker const&) = delete;
 
-    http_worker(tcp::acceptor& acceptor, const std::string& doc_root) :
+    http_worker(tcp::acceptor& acceptor, fasttext::FastText& fasttext) :
         acceptor_(acceptor),
-        doc_root_(doc_root)
+        fasttext_(fasttext)
     {
     }
 
@@ -58,8 +62,8 @@ private:
     // The acceptor used to listen for incoming connections.
     tcp::acceptor& acceptor_;
 
-    // The path to the root of the document directory.
-    std::string doc_root_;
+    // The model that determines vector representations.
+    fasttext::FastText& fasttext_;
 
     // The socket for the currently connected client.
     tcp::socket socket_{acceptor_.get_executor()};
@@ -83,11 +87,11 @@ private:
     // The string-based response serializer.
     boost::optional<http::response_serializer<http::string_body, http::basic_fields<alloc_t>>> string_serializer_;
 
-    // The file-based response message.
-    boost::optional<http::response<http::file_body, http::basic_fields<alloc_t>>> file_response_;
+    // The vector-based response message.
+    boost::optional<http::response<http::vector_body<std::byte>, http::basic_fields<alloc_t>>> vector_response_;
 
-    // The file-based response serializer.
-    boost::optional<http::response_serializer<http::file_body, http::basic_fields<alloc_t>>> file_serializer_;
+    // The vector-based response serializer.
+    boost::optional<http::response_serializer<http::vector_body<std::byte>, http::basic_fields<alloc_t>>> vector_serializer_;
 
     void accept()
     {
@@ -151,7 +155,7 @@ private:
         switch (req.method())
         {
         case http::verb::get:
-            send_test(req.target());
+            send_vector(req.target());
             break;
 
         default:
@@ -194,71 +198,42 @@ private:
             });
     }
 
-    // void send_file(beast::string_view target)
-    // {
-    //     // Request path must be absolute and not contain "..".
-    //     if (target.empty() || target[0] != '/' || target.find("..") != std::string::npos)
-    //     {
-    //         send_bad_response(
-    //             http::status::not_found,
-    //             "File not found\r\n");
-    //         return;
-    //     }
+    void send_vector(beast::string_view encoded) {
+        encoded.remove_prefix(1); // remove leading /
+        boost::urls::decode_view ds( encoded );
 
-    //     std::string full_path = doc_root_;
-    //     full_path.append(
-    //         target.data(),
-    //         target.size());
+        fasttext::Vector vec(fasttext_.getDimension());
+        fasttext_.getWordVector(vec, std::string(ds.begin(), ds.end()));
 
-    //     http::file_body::value_type file;
-    //     beast::error_code ec;
-    //     file.open(
-    //         full_path.c_str(),
-    //         beast::file_mode::read,
-    //         ec);
-    //     if(ec)
-    //     {
-    //         send_bad_response(
-    //             http::status::not_found,
-    //             "File not found\r\n");
-    //         return;
-    //     }
+        http::vector_body<std::byte>::value_type vector(
+            reinterpret_cast<std::byte*>(vec.data()),
+            reinterpret_cast<std::byte*>(vec.data())
+            + fasttext_.getDimension() * sizeof(fasttext::real));
 
-    //     file_response_.emplace(
-    //         std::piecewise_construct,
-    //         std::make_tuple(),
-    //         std::make_tuple(alloc_));
+        vector_response_.emplace(
+            std::piecewise_construct,
+            std::make_tuple(),
+            std::make_tuple(alloc_));
+        
+        vector_response_->result(http::status::ok);
+        vector_response_->keep_alive(false);
+        vector_response_->set(http::field::server, "Beast");
+        vector_response_->set(http::field::content_type, "application/octet-stream");
+        vector_response_->body() = std::move(vector);
+        vector_response_->prepare_payload();
 
-    //     file_response_->result(http::status::ok);
-    //     file_response_->keep_alive(false);
-    //     file_response_->set(http::field::server, "Beast");
-    //     file_response_->set(http::field::content_type, mime_type(std::string(target)));
-    //     file_response_->body() = std::move(file);
-    //     file_response_->prepare_payload();
+        vector_serializer_.emplace(*vector_response_);
 
-    //     file_serializer_.emplace(*file_response_);
-
-    //     http::async_write(
-    //         socket_,
-    //         *file_serializer_,
-    //         [this](beast::error_code ec, std::size_t)
-    //         {
-    //             socket_.shutdown(tcp::socket::shutdown_send, ec);
-    //             file_serializer_.reset();
-    //             file_response_.reset();
-    //             accept();
-    //         });
-    // }
-
-    void send_test(beast::string_view target) {
-        std::string response = "Message is: ";
-        response.append(
-            target.data(),
-            target.size());
-
-        send_bad_response(
-            http::status::not_implemented,
-            response);
+        http::async_write(
+            socket_,
+            *vector_serializer_,
+            [this](beast::error_code ec, std::size_t)
+            {
+                socket_.shutdown(tcp::socket::shutdown_send, ec);
+                vector_serializer_.reset();
+                vector_response_.reset();
+                accept();
+            });
     }
     
     void check_deadline()
@@ -297,11 +272,13 @@ int main(int argc, char* argv[])
             return EXIT_FAILURE;
         }
 
-        auto const address = net::ip::make_address(argv[1]);
+        auto const address = net::ip::make_address("0.0.0.0");
         unsigned short port = static_cast<unsigned short>(std::atoi(argv[2]));
-        std::string doc_root = argv[3];
         int num_workers = std::atoi(argv[4]);
-        bool spin = (std::strcmp(argv[5], "spin") == 0);
+        
+        fasttext::FastText fasttext;
+        fasttext.loadModel("/var/www/src/model.bin");
+        std::cerr << "loaded model" << std::endl;
 
         net::io_context ioc{1};
         tcp::acceptor acceptor{ioc, {address, port}};
@@ -309,14 +286,12 @@ int main(int argc, char* argv[])
         std::list<http_worker> workers;
         for (int i = 0; i < num_workers; ++i)
         {
-            workers.emplace_back(acceptor, doc_root);
+            workers.emplace_back(acceptor, fasttext);
             workers.back().start();
         }
 
-        if (spin)
-          for (;;) ioc.poll();
-        else
-          ioc.run();
+        for (;;) ioc.poll(); //spin
+        // ioc.run(); //block
     }
     catch (const std::exception& e)
     {

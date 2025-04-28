@@ -8,7 +8,8 @@ RUN apk update && \
     apk add --no-cache \
     build-base \
     make \
-    boost-dev
+    boost-dev \
+    fasttext-dev
 
 WORKDIR /server
 
@@ -19,8 +20,6 @@ RUN make
 
 # ENTRYPOINT [ "/bin/sh", "-c", "while true; do sleep 1000; done" ]
 
-# RUN make
-
 #################################################
 ######### server image
 #################################################
@@ -29,7 +28,9 @@ FROM alpine
 
 RUN apk update && \
     apk add --no-cache \
-    libstdc++
+    libstdc++ \
+    boost-url \
+    fasttext-libs
 
 RUN addgroup -S shs && adduser -S shs -G shs
 USER shs
@@ -37,5 +38,9 @@ USER shs
 COPY --chown=shs:shs --from=build \
     ./server/ \
     ./app/
+
+ARG port=8080
+ARG workers=100
+ARG model=model.bin
 
 ENTRYPOINT [ "./app/main", "0.0.0.0", "8080", ".", "100", "spin" ]
