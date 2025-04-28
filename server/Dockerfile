@@ -36,7 +36,7 @@ RUN addgroup -S shs && adduser -S shs -G shs
 USER shs
 
 COPY --chown=shs:shs --from=build \
-    ./server/ \
+    ./server/main \
     ./app/
 
 ARG port=8080
