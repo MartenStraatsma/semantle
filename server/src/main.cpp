@@ -158,10 +158,6 @@ private:
             send_vector(req.target());
             break;
 
-        case http::verb::options:
-            send_preflight(req);
-            break;
-
         default:
             // We return responses indicating an error if
             // we do not recognize the request method.
@@ -186,33 +182,6 @@ private:
         string_response_->set(http::field::server, "Beast");
         string_response_->set(http::field::content_type, "text/plain");
         string_response_->body() = error;
-        string_response_->prepare_payload();
-
-        string_serializer_.emplace(*string_response_);
-
-        http::async_write(
-            socket_,
-            *string_serializer_,
-            [this](beast::error_code ec, std::size_t)
-            {
-                socket_.shutdown(tcp::socket::shutdown_send, ec);
-                string_serializer_.reset();
-                string_response_.reset();
-                accept();
-            });
-    }
-
-    void send_preflight(http::request<request_body_t, http::basic_fields<alloc_t>> const& req) {
-        string_response_.emplace(
-            std::piecewise_construct,
-            std::make_tuple(),
-            std::make_tuple(alloc_));
-        
-        string_response_->result(http::status::ok);
-        string_response_->set(http::field::access_control_allow_origin, "*");
-        string_response_->set(http::field::access_control_allow_methods, "GET, OPTIONS");
-        string_response_->set(http::field::access_control_allow_headers, "*");
-        string_response_->body() = "";
         string_response_->prepare_payload();
 
         string_serializer_.emplace(*string_response_);
