@@ -93,8 +93,7 @@ private:
     // The vector-based response serializer.
     boost::optional<http::response_serializer<http::vector_body<std::byte>, http::basic_fields<alloc_t>>> vector_serializer_;
 
-    void accept()
-    {
+    void accept() {
         // Clean up any previous connection.
         beast::error_code ec;
         socket_.close(ec);
@@ -102,25 +101,20 @@ private:
 
         acceptor_.async_accept(
             socket_,
-            [this](beast::error_code ec)
-            {
+            [this](beast::error_code ec) {
                 if (ec)
-                {
                     accept();
-                }
-                else
-                {
-                    // Request must be fully processed within 60 seconds.
-                    request_deadline_.expires_after(
-                        std::chrono::seconds(60));
 
+                else {
+                    // Request must be fully processed within 60 seconds.
+                    request_deadline_.expires_after(std::chrono::seconds(60));
                     read_request();
                 }
-            });
+            }
+        );
     }
 
-    void read_request()
-    {
+    void read_request() {
         // On each read the parser needs to be destroyed and
         // recreated. We store it in a boost::optional to
         // achieve that.
@@ -135,47 +129,44 @@ private:
         parser_.emplace(
             std::piecewise_construct,
             std::make_tuple(),
-            std::make_tuple(alloc_));
+            std::make_tuple(alloc_)
+        );
 
         http::async_read(
             socket_,
             buffer_,
             *parser_,
-            [this](beast::error_code ec, std::size_t)
-            {
+            [this](beast::error_code ec, std::size_t) {
                 if (ec)
                     accept();
                 else
                     process_request(parser_->get());
-            });
+            }
+        );
     }
 
-    void process_request(http::request<request_body_t, http::basic_fields<alloc_t>> const& req)
-    {
-        switch (req.method())
-        {
+    void process_request(http::request<request_body_t, http::basic_fields<alloc_t>> const& req) {
+        switch (req.method()) {
         case http::verb::get:
             send_vector(req.target());
             break;
 
         default:
-            // We return responses indicating an error if
-            // we do not recognize the request method.
+            // We return responses indicating an error if we do not recognize the request method.
             send_bad_response(
                 http::status::bad_request,
-                "Invalid request-method '" + std::string(req.method_string()) + "'\r\n");
+                "Invalid request-method '" + std::string(req.method_string()) + "'\r\n"
+            );
             break;
         }
     }
 
-    void send_bad_response(
-        http::status status,
-        std::string const& error)
-    {
+    void send_bad_response(http::status status, std::string const& error) {
         string_response_.emplace(
             std::piecewise_construct,
             std::make_tuple(),
-            std::make_tuple(alloc_));
+            std::make_tuple(alloc_)
+        );
 
         string_response_->result(status);
         string_response_->keep_alive(false);
@@ -189,13 +180,13 @@ private:
         http::async_write(
             socket_,
             *string_serializer_,
-            [this](beast::error_code ec, std::size_t)
-            {
+            [this](beast::error_code ec, std::size_t) {
                 socket_.shutdown(tcp::socket::shutdown_send, ec);
                 string_serializer_.reset();
                 string_response_.reset();
                 accept();
-            });
+            }
+        );
     }
 
     void send_vector(beast::string_view encoded) {
@@ -208,12 +199,14 @@ private:
         http::vector_body<std::byte>::value_type vector(
             reinterpret_cast<std::byte*>(vec.data()),
             reinterpret_cast<std::byte*>(vec.data())
-            + fasttext_.getDimension() * sizeof(fasttext::real));
+            + fasttext_.getDimension() * sizeof(fasttext::real)
+        );
 
         vector_response_.emplace(
             std::piecewise_construct,
             std::make_tuple(),
-            std::make_tuple(alloc_));
+            std::make_tuple(alloc_)
+        );
         
         vector_response_->result(http::status::ok);
         vector_response_->keep_alive(false);
@@ -228,74 +221,56 @@ private:
         http::async_write(
             socket_,
             *vector_serializer_,
-            [this](beast::error_code ec, std::size_t)
-            {
+            [this](beast::error_code ec, std::size_t) {
                 socket_.shutdown(tcp::socket::shutdown_send, ec);
                 vector_serializer_.reset();
                 vector_response_.reset();
                 accept();
-            });
+            }
+        );
     }
     
-    void check_deadline()
-    {
+    void check_deadline() {
         // The deadline may have moved, so check it has really passed.
-        if (request_deadline_.expiry() <= std::chrono::steady_clock::now())
-        {
+        if (request_deadline_.expiry() <= std::chrono::steady_clock::now()) {
             // Close socket to cancel any outstanding operation.
             socket_.close();
 
             // Sleep indefinitely until we're given a new deadline.
-            request_deadline_.expires_at(
-                (std::chrono::steady_clock::time_point::max)());
+            request_deadline_.expires_at(std::chrono::steady_clock::time_point::max());
         }
 
         request_deadline_.async_wait(
-            [this](beast::error_code)
-            {
-                check_deadline();
-            });
+            [this](beast::error_code){ check_deadline(); }
+        );
     }
 };
 
-int main(int argc, char* argv[])
-{
-    try
-    {
-        // Check command line arguments.
-        if (argc != 6)
-        {
-            std::cerr << "Usage: http_server_fast <address> <port> <doc_root> <num_workers> {spin|block}\n";
-            std::cerr << "  For IPv4, try:\n";
-            std::cerr << "    http_server_fast 0.0.0.0 80 . 100 block\n";
-            std::cerr << "  For IPv6, try:\n";
-            std::cerr << "    http_server_fast 0::0 80 . 100 block\n";
-            return EXIT_FAILURE;
-        }
-
-        auto const address = net::ip::make_address("0.0.0.0");
-        unsigned short port = static_cast<unsigned short>(std::atoi(argv[2]));
-        int num_workers = std::atoi(argv[4]);
-        
-        fasttext::FastText fasttext;
-        fasttext.loadModel("/var/www/src/model.bin");
-        std::cerr << "loaded model" << std::endl;
-
+int main(int argc, char* argv[]) {
+    try {
         net::io_context ioc{1};
-        tcp::acceptor acceptor{ioc, {address, port}};
+        auto const address = net::ip::make_address("0.0.0.0");
+        
+        fasttext::FastText fasttext[3];
+        fasttext[0].loadModel("/var/www/en.bin");
+        fasttext[1].loadModel("/var/www/ko.bin");
+        fasttext[2].loadModel("/var/www/nl.bin");
+
+        tcp::acceptor acceptor[3] = {
+            {ioc, {address, 80}},
+            {ioc, {address, 81}},
+            {ioc, {address, 82}}
+        };
 
         std::list<http_worker> workers;
-        for (int i = 0; i < num_workers; ++i)
-        {
-            workers.emplace_back(acceptor, fasttext);
-            workers.back().start();
-        }
-
-        for (;;) ioc.poll(); //spin
-        // ioc.run(); //block
-    }
-    catch (const std::exception& e)
-    {
+        for (int i = 0; i < 3; i++)
+            for (int j = 0; j < 5; j++) {
+                workers.emplace_back(acceptor[i], fasttext[i]);
+                workers.back().start();
+            }
+        
+        ioc.run();
+    } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
         return EXIT_FAILURE;
     }

@@ -18,8 +18,6 @@ COPY Makefile .
 
 RUN make
 
-# ENTRYPOINT [ "/bin/sh", "-c", "while true; do sleep 1000; done" ]
-
 #################################################
 ######### server image
 #################################################
@@ -39,8 +37,4 @@ COPY --chown=shs:shs --from=build \
     ./server/main \
     ./app/
 
-ARG port=8080
-ARG workers=100
-ARG model=model.bin
-
-ENTRYPOINT [ "./app/main", "0.0.0.0", "8080", ".", "100", "spin" ]
+ENTRYPOINT [ "./app/main" ]
