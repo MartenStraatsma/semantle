@@ -28,8 +28,7 @@
 #include <memory>
 #include <string>
 
-#include <fasttext/real.h>
-#include <fasttext/fasttext.h>
+#include "koreanfasttext.h"
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
@@ -251,11 +250,16 @@ int main(int argc, char* argv[]) {
         net::io_context ioc{1};
         auto const address = net::ip::make_address("0.0.0.0");
         
-        fasttext::FastText fasttext[3];
-        fasttext[0].loadModel("/var/www/en.bin");
-        fasttext[1].loadModel("/var/www/ko.bin");
-        fasttext[2].loadModel("/var/www/nl.bin");
+        std::cout << "Loading FastText models" << std::endl;
+        std::unique_ptr<fasttext::FastText> fasttext[3];
+        fasttext[0] = std::make_unique<fasttext::FastText>();
+        fasttext[0]->loadModel("/var/www/en.bin");
+        fasttext[1] = std::make_unique<fasttext::KoreanFastText>();
+        fasttext[1]->loadModel("/var/www/ko.bin");
+        fasttext[2] = std::make_unique<fasttext::FastText>();
+        fasttext[2]->loadModel("/var/www/nl.bin");
 
+        std::cout << "Starting server" << std::endl;
         tcp::acceptor acceptor[3] = {
             {ioc, {address, 80}},
             {ioc, {address, 81}},
@@ -265,7 +269,7 @@ int main(int argc, char* argv[]) {
         std::list<http_worker> workers;
         for (int i = 0; i < 3; i++)
             for (int j = 0; j < 5; j++) {
-                workers.emplace_back(acceptor[i], fasttext[i]);
+                workers.emplace_back(acceptor[i], *fasttext[i]);
                 workers.back().start();
             }
         
