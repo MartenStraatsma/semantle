@@ -70,5 +70,5 @@ function decompose_seq(phrase) {
     if (!is_all_한글(phrase))
         throw new Error("The target string must be 한글.");
 
-    return [...phrase].flatMap(decompose).join();
+    return [...phrase].flatMap(decompose).join('');
 }

@@ -1,8 +1,8 @@
 let guesses = [];
 
 // generate a secret word
-let answer;
-fetch(url + "엄마")
+let answerVector;
+fetch(url + preprocess(answer))
 .then(response => {
     if (response.ok)
         return Promise.resolve(response);
@@ -13,7 +13,7 @@ fetch(url + "엄마")
     return response.arrayBuffer();
 })
 .then(arrayBuffer => {
-    answer = new Float32Array(arrayBuffer);
+    answerVector = new Float32Array(arrayBuffer);
 })
 .catch(error => {
     console.error("Request failed", error);
@@ -80,7 +80,7 @@ document.getElementsByTagName("form")[0].addEventListener('submit', async e => {
                 })
                 .then(arrayBuffer => {
                     const vector = new Float32Array(arrayBuffer);
-                    let val = 50 * (1 + dot(answer, vector) / (Math.sqrt(dot(answer, answer)) * Math.sqrt(dot(vector, vector))));
+                    let val = 50 * (1 + dot(answerVector, vector) / (Math.sqrt(dot(answerVector, answerVector)) * Math.sqrt(dot(vector, vector))));
                     guesses.push([word, val]);
                     guesses.sort(function(x,y) {return y[1] - x[1]});
                     document.getElementsByClassName("info-bar")[0].innerHTML = "<span class=\"label\">" + counter + "</span>\n<span>" + guesses.length.toString() + "</span>";
