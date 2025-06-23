@@ -63,7 +63,7 @@ function guesshistory (word) {
     document.getElementsByClassName("word")[0].value = "";
     document.getElementsByClassName("guess-history")[0].innerHTML = "";
     for ([entry, val] of guesses)
-        document.getElementsByClassName("guess-history")[0].innerHTML += listEntry(entry, val, entry === word);
+        document.getElementsByClassName("guess-history")[0].innerHTML += listEntry(entry, val, entry.toLowerCase() === word.toLowerCase());
 }
 
 //////////////////////////////////////////////////
@@ -198,8 +198,8 @@ document.getElementsByTagName("form")[0].addEventListener('submit', async e => {
             document.getElementsByClassName("message")[0].innerHTML = "<div class=\"message-text\">" + already(word) + "</div>";
 
         // correct guess
-        else if (word === answer) {
-            guesses.unshift([word, 100]);
+        else if (word.toLowerCase() === answer.toLowerCase()) {
+            guesses.unshift([answer, 100]);
             infobar();
             document.getElementsByClassName("message")[0].innerHTML = "<div>\n" + listEntry(word, 100, true) + "\n</div>";
             document.getElementsByClassName("btn")[2].disabled = true;
