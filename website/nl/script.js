@@ -24,6 +24,7 @@ const loading = "<div class=\"loading-text\">"
               + "</div>";
 
 const counter = "Pogingen:";
+const hinter = "Hints:";
 
 const preprocess = (x) => x;
 

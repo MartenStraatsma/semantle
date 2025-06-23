@@ -20,6 +20,7 @@ const loading = "<div class=\"loading-text\">"
               + "</div>";
 
 const counter = "추측:";
+const hinter = "힌트:";
 
 const preprocess = decompose_seq;
 

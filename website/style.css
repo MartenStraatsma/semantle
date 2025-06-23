@@ -120,7 +120,7 @@ b {
 .title {
     flex-grow: 1;
     text-align: center;
-    margin-left: -32px;
+    margin-left: 32px;
 }
 
 .title h1 {
