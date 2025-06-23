@@ -201,7 +201,7 @@ document.getElementsByTagName("form")[0].addEventListener('submit', async e => {
         else if (word.toLowerCase() === answer.toLowerCase()) {
             guesses.unshift([answer, 100]);
             infobar();
-            document.getElementsByClassName("message")[0].innerHTML = "<div>\n" + listEntry(word, 100, true) + "\n</div>";
+            document.getElementsByClassName("message")[0].innerHTML = "<div>\n" + listEntry(answer, 100, true) + "\n</div>";
             document.getElementsByClassName("btn")[2].disabled = true;
             document.getElementsByClassName("btn")[3].disabled = true;
 
