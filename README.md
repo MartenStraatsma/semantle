@@ -26,7 +26,7 @@ FastText needs excessive RAM to load all models, but is not dependent on fast me
 To this end, loading models in swap memory is highly recommended.
 ```shell
 docker run \
--p 8080-8082:80-82
+-p 8080-8082:80-82 \
 --mount type=bind,source=/absolute/path/to/model/files,target=/var/www \
 --memory="256m" \
 --memory-swap="28g" \
