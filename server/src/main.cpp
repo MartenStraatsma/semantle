@@ -1,18 +1,3 @@
-//
-// Copyright (c) 2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
-//
-// Distributed under the Boost Software License, Version 1.0. (See accompanying
-// file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
-//
-// Official repository: https://github.com/boostorg/beast
-//
-
-//------------------------------------------------------------------------------
-//
-// Example: HTTP server, fast
-//
-//------------------------------------------------------------------------------
-
 #include "fields_alloc.hpp"
 
 #include <boost/beast/core.hpp>
@@ -35,8 +20,7 @@ namespace http = beast::http;           // from <boost/beast/http.hpp>
 namespace net = boost::asio;            // from <boost/asio.hpp>
 using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
-class http_worker
-{
+class http_worker {
 public:
     http_worker(http_worker const&) = delete;
     http_worker& operator=(http_worker const&) = delete;
@@ -44,18 +28,15 @@ public:
     http_worker(tcp::acceptor& acceptor, fasttext::FastText& fasttext) :
         acceptor_(acceptor),
         fasttext_(fasttext)
-    {
-    }
+    {}
 
-    void start()
-    {
+    void start() {
         accept();
         check_deadline();
     }
 
 private:
     using alloc_t = fields_alloc<char>;
-    //using request_body_t = http::basic_dynamic_body<beast::flat_static_buffer<1024 * 1024>>;
     using request_body_t = http::string_body;
 
     // The acceptor used to listen for incoming connections.
@@ -77,8 +58,7 @@ private:
     boost::optional<http::request_parser<request_body_t, alloc_t>> parser_;
 
     // The timer putting a time limit on requests.
-    net::steady_timer request_deadline_{
-        acceptor_.get_executor(), (std::chrono::steady_clock::time_point::max)()};
+    net::steady_timer request_deadline_{acceptor_.get_executor(), (std::chrono::steady_clock::time_point::max)()};
 
     // The string-based response message.
     boost::optional<http::response<http::string_body, http::basic_fields<alloc_t>>> string_response_;
@@ -103,7 +83,6 @@ private:
             [this](beast::error_code ec) {
                 if (ec)
                     accept();
-
                 else {
                     // Request must be fully processed within 60 seconds.
                     request_deadline_.expires_after(std::chrono::seconds(60));
@@ -146,17 +125,17 @@ private:
 
     void process_request(http::request<request_body_t, http::basic_fields<alloc_t>> const& req) {
         switch (req.method()) {
-        case http::verb::get:
-            send_vector(req.target());
-            break;
+            case http::verb::get:
+                send_vector(req.target());
+                break;
 
-        default:
-            // We return responses indicating an error if we do not recognize the request method.
-            send_bad_response(
-                http::status::bad_request,
-                "Invalid request-method '" + std::string(req.method_string()) + "'\r\n"
-            );
-            break;
+            default:
+                // We return responses indicating an error if we do not recognize the request method.
+                send_bad_response(
+                    http::status::bad_request,
+                    "Invalid request-method '" + std::string(req.method_string()) + "'\r\n"
+                );
+                break;
         }
     }
 
@@ -239,9 +218,7 @@ private:
             request_deadline_.expires_at(std::chrono::steady_clock::time_point::max());
         }
 
-        request_deadline_.async_wait(
-            [this](beast::error_code){ check_deadline(); }
-        );
+        request_deadline_.async_wait([this](beast::error_code){ check_deadline(); });
     }
 };
 
