@@ -36,8 +36,32 @@ function is_all_한글(phrase) {
     return [...phrase].every((value) =>
            value.charCodeAt(0) >= FIRST_한글_UNICODE
         && value.charCodeAt(0) <= LAST_한글_UNICODE
-        || 초성.concat(중성, 종성).includes(value)
+        || 초성.concat(중성, 종성.slice(1, NUM_종성)).includes(value)
     );
+}
+
+/**
+ * Returns the index of the 한글 character in the 한글 unicode range.
+ * @param {string} letter 
+ * @returns {number} The index of the 한글 character.
+ */
+function 한글_index(letter) {
+    return letter.charCodeAt(0) - FIRST_한글_UNICODE;
+}
+
+/**
+ * Returns the indices of 초성, 중성, and 종성 from the 한글 unicode code.
+ * @param {number} code 
+ * @returns {Array<number>} An array containing the indices of 초성, 중성, and 종성.
+ */
+function decompose_index(code) {
+    const 종성_index = code % NUM_종성;
+    code = (code / NUM_종성) |0;
+    const 중성_index = code % NUM_중성;
+    code = (code / NUM_중성) |0;
+    const 초성_index = code;
+    
+    return [초성_index, 중성_index, 종성_index];
 }
 
 /**
@@ -51,14 +75,19 @@ function decompose(한글_letter) {
     if(!is_한글(한글_letter))
         throw new Error("The target string must be 한글.");
 
-    let code = 한글_letter.charCodeAt(0) - FIRST_한글_UNICODE;
-    const 종성_index = code % NUM_종성;
-    code = (code / NUM_종성) |0;
-    const 중성_index = code % NUM_중성;
-    code = (code / NUM_중성) |0;
-    const 초성_index = code;
+    if (초성.includes(한글_letter))
+        return [한글_letter, 'e', 'e'];
 
-    return [초성[초성_index], 중성[중성_index], 종성[종성_index]];
+    if (중성.includes(한글_letter))
+        return ['e', 한글_letter, 'e'];
+
+    if (종성.includes(한글_letter))
+        return ['e', 'e', 한글_letter];
+
+    let code = 한글_index(한글_letter);
+    let [초, 중, 종] = decompose_index(code);
+    
+    return [초성[초], 중성[중], 종성[종]];
 }
 
 /**
