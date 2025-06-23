@@ -1,27 +1,16 @@
+//////////////////////////////////////////////////
+////////// variables
+//////////////////////////////////////////////////
 let guesses = [];
 let hintCount = 0;
-
-// generate a secret word
 let answerVector;
-fetch(url + preprocess(answer))
-.then(response => {
-    if (response.ok)
-        return Promise.resolve(response);
-    else
-        return Promise.reject(new Error(response.statusText));
-})
-.then(response => {
-    return response.arrayBuffer();
-})
-.then(arrayBuffer => {
-    answerVector = new Float32Array(arrayBuffer);
-    document.getElementsByTagName("input")[0].disabled = false;
-})
-.catch(error => {
-    console.error("Request failed", error);
-    alert(noprocess);
-});
+let howToPlay = document.getElementsByClassName("how-to-play")[0];
 
+//////////////////////////////////////////////////
+////////// HTML functions
+//////////////////////////////////////////////////
+
+// enable API calls
 function enable () {
     document.getElementsByTagName("input")[0].disabled = false;
     document.getElementsByTagName("input")[0].focus();
@@ -31,10 +20,27 @@ function enable () {
         document.getElementsByClassName("btn")[3].disabled = false;
 }
 
+// disable API calls
 function disable () {
     document.getElementsByTagName("input")[0].disabled = true;
     document.getElementsByClassName("btn")[2].disabled = true;
     document.getElementsByClassName("btn")[3].disabled = true;
+}
+
+// set the HTML for the information bar
+function infobar () {
+    document.getElementsByClassName("info-bar")[0].innerHTML =
+          "<span class=\"label\">"
+        + counter
+        + "</span>\n<span>"
+        + (guesses.length - hintCount).toString()
+        + "</span>"
+        + (hintCount ?
+          "\n<span class=\"label\">"
+        + hinter
+        + "</span>\n<span>"
+        + hintCount.toString()
+        + "</span>" : "");
 }
 
 // generate the HTML for a list entry
@@ -52,21 +58,7 @@ function listEntry (word, val, current) {
          + "</span>\n</div>\n</div>";
 }
 
-function infobar () {
-    document.getElementsByClassName("info-bar")[0].innerHTML =
-          "<span class=\"label\">"
-        + counter
-        + "</span>\n<span>"
-        + (guesses.length - hintCount).toString()
-        + "</span>"
-        + (hintCount ?
-          "\n<span class=\"label\">"
-        + hinter
-        + "</span>\n<span>"
-        + hintCount.toString()
-        + "</span>" : "");
-}
-
+// set the HTML for the guess history
 function guesshistory (word) {
     document.getElementsByClassName("word")[0].value = "";
     document.getElementsByClassName("guess-history")[0].innerHTML = "";
@@ -74,12 +66,14 @@ function guesshistory (word) {
         document.getElementsByClassName("guess-history")[0].innerHTML += listEntry(entry, val, entry === word);
 }
 
+//////////////////////////////////////////////////
+////////// scoring functions
+//////////////////////////////////////////////////
+
 // computes the dot product
 dot = (a, b) => a.map((x, i) => a[i] * b[i]).reduce((m, n) => m + n);
 
-// grab the element of the initial pop-up
-let howToPlay = document.getElementsByClassName("how-to-play")[0];
-
+// call API for a word
 async function call (word, postprocess) {
     if (!document.getElementsByTagName("input")[0].disabled) {
         document.getElementsByClassName("message")[0].innerHTML = "<div class=\"message-text\">" + loading + "</div>";
@@ -100,8 +94,10 @@ async function call (word, postprocess) {
     }
 }
 
+// linearly map dot product to a score
 let linearScore = vector => 50 * (1 + dot(answerVector, vector) / (Math.sqrt(dot(answerVector, answerVector)) * Math.sqrt(dot(vector, vector))));
 
+// map hyperspherical surface area to a score
 function algebraicScore (vector) {
     const x = dot(answerVector, vector) / (Math.sqrt(dot(answerVector, answerVector)) * Math.sqrt(dot(vector, vector)));
     const ret = 50000000000 / 1570796729 * (Math.asin(x) + x * Math.sqrt(1 - x*x)) + 50.000012802582773474570;
@@ -109,6 +105,7 @@ function algebraicScore (vector) {
     return ret;
 }
 
+// normalise dot product to a score
 function normalScore (vector) {
     function ncdf(x, mean=0.16, std=0.16) {
         var x = (x - mean) / std;
@@ -123,7 +120,58 @@ function normalScore (vector) {
     return x === 1 ? 100 : 100 * ncdf(x);
 }
 
+// used score is the normal score
 let score = normalScore;
+
+//////////////////////////////////////////////////
+////////// event handlers
+//////////////////////////////////////////////////
+
+// reveal the answer
+document.getElementsByClassName("btn")[2].addEventListener("click", e => {
+    e.preventDefault();
+    guesses.unshift([answer, 100]);
+    infobar();
+    document.getElementsByClassName("message")[0].innerHTML = "<div>\n" + listEntry(answer, 100, true) + "\n</div>";
+    guesshistory(answer);
+    document.getElementsByClassName("btn")[2].disabled = true;
+    document.getElementsByClassName("btn")[3].disabled = true;
+});
+
+// provide a hint
+document.getElementsByClassName("btn")[3].addEventListener("click", async e => {
+    e.preventDefault();
+    do {
+        const word = words[Math.floor(Math.random() * words.length)];
+        if (word === answer || guesses.some(row => row[0] === word))
+            continue;
+
+        await call(word, vector => {
+            const val = score(vector);
+            if (val <= guesses[0][1])
+                return;
+
+            guesses.unshift([word, val]);
+            hintCount++;
+            document.getElementsByClassName("message")[0].innerHTML = "<div>\n" + listEntry(word, val, true) + "\n</div>";
+            infobar();
+            guesshistory(word);
+            enable();
+        });
+    } while (document.getElementsByTagName("input")[0].disabled);
+});
+
+// open the info pop-up
+document.getElementsByClassName("btn")[4].addEventListener("click", e => {
+    e.preventDefault();
+    document.getElementsByClassName("modal-bg")[0].style["visibility"] = "visible";
+});
+
+// close the info pop-up
+document.getElementsByClassName("modal-close-button")[0].addEventListener("click", e => {
+    e.preventDefault();
+    document.getElementsByClassName("modal-bg")[0].style["visibility"] = "hidden";
+});
 
 // process a guess
 document.getElementsByTagName("form")[0].addEventListener('submit', async e => {
@@ -154,6 +202,8 @@ document.getElementsByTagName("form")[0].addEventListener('submit', async e => {
             guesses.unshift([word, 100]);
             infobar();
             document.getElementsByClassName("message")[0].innerHTML = "<div>\n" + listEntry(word, 100, true) + "\n</div>";
+            document.getElementsByClassName("btn")[2].disabled = true;
+            document.getElementsByClassName("btn")[3].disabled = true;
 
         // valid guess
         } else {
@@ -171,48 +221,13 @@ document.getElementsByTagName("form")[0].addEventListener('submit', async e => {
     }
 });
 
-// reveal the answer
-document.getElementsByClassName("btn")[2].addEventListener("click", e => {
-    e.preventDefault();
-    guesses.unshift([answer, 100]);
-    infobar();
-    document.getElementsByClassName("message")[0].innerHTML = "<div>\n" + listEntry(answer, 100, true) + "\n</div>";
-    guesshistory(answer);
-    document.getElementsByClassName("btn")[2].disabled = true;
-    document.getElementsByClassName("btn")[3].disabled = true;
-});
+//////////////////////////////////////////////////
+////////// main loop
+//////////////////////////////////////////////////
 
-// provide a hint
-document.getElementsByClassName("btn")[3].addEventListener("click", async e => {
-    e.preventDefault();
-    do {
-        const word = words[Math.floor(Math.random() * words.length)];
-        if (word === answer || guesses.some(row => row[0] === word))
-            continue;
 
-        await call(word, vector => {
-            const val = score(vector);
-            if (val <= guesses[0][1])
-                return;
-
-            guesses.unshift([word, val]);
-            infobar();
-            document.getElementsByClassName("message")[0].innerHTML = "<div>\n" + listEntry(word, val, true) + "\n</div>";
-            guesshistory(word);
-            hintCount++;
-            enable();
-        });
-    } while (document.getElementsByTagName("input")[0].disabled);
-});
-
-// open the info pop-up
-document.getElementsByClassName("btn")[4].addEventListener("click", e => {
-    e.preventDefault();
-    document.getElementsByClassName("modal-bg")[0].style["visibility"] = "visible";
-});
-
-// close the info pop-up
-document.getElementsByClassName("modal-close-button")[0].addEventListener("click", e => {
-    e.preventDefault();
-    document.getElementsByClassName("modal-bg")[0].style["visibility"] = "hidden";
+// generate a secret word
+call(answer, vector => {
+    answerVector = vector;
+    document.getElementsByTagName("input")[0].disabled = false;
 });
