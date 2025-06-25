@@ -2,11 +2,8 @@ const url = "http://localhost:8082/";
 
 const multiple = "Typ maar één woord.";
 
-function already (word) {
-    return "Het woord <b>"
-         + word
-         + "</b> is al gegokt.";
-}
+const already = word =>
+    "Het woord <b>" + word + "</b> is al gegokt.";
 
 const loading = "<div class=\"loading-text\">"
               + "<span style=\"--i:  0;\" class=\"visible\">B</span>"
@@ -23,7 +20,20 @@ const loading = "<div class=\"loading-text\">"
               + "<span style=\"--i: 11;\" class=\"visible\">.</span>"
               + "</div>";
 
-const counter = "Pogingen:";
+const success = (guesses, hints) =>
+    "<p class=\"bigger\"><span>Gefeliciteerd!</span></p>\n"
+    + "<p><span>Je hebt het</span> woord <br>in <b>"
+    + guesses.toString()
+    + "</b> gokken"
+    + (hints ? " en <b>" + hints.toString() + "</b> hints geraden.</p>\n" : " geraden.\n");
+
+const fail = (word, guesses, hints) =>
+    "<p class=\"bigger\"><span>Volgende keer beter!</span></p>\n"
+    + "<p><span>Je hebt het opgegeven in <b>" + guesses.toString() + "</b> gokken"
+    + (hints ? " en <b>" + hints.toString() + "</b> hints.</p>\n" : ".\n")
+    + "<p>Het woord was <b>" + word + "</b>.</p>\n";
+
+const counter = "Gokken:";
 const hinter = "Hints:";
 
 const preprocess = (x) => x;

@@ -66,6 +66,18 @@ function guesshistory (word) {
         document.getElementsByClassName("guess-history")[0].innerHTML += listEntry(entry, val, entry.toLowerCase() === word.toLowerCase());
 }
 
+// set the HTML for the results graph
+function graph () {
+    const greens = guesses.filter(([_, s]) => 3*s >= 200).length;
+    const yellows = guesses.filter(([_, s]) => 3*s >= 100 && 3*s < 200).length;
+    const reds = guesses.filter(([_, s]) => 3*s < 100).length;
+    const tot = guesses.length < 3 ? guesses.length : 40 / (1 + Math.exp(-0.014 * guesses.length)) - 17;
+    document.getElementsByClassName("chart")[0].innerHTML =
+        "🟩".repeat(Math.ceil(greens/guesses.length*tot)) + " " + greens.toString() + "\n"
+      + "🟨".repeat(Math.ceil(yellows/guesses.length*tot)) + " " + yellows.toString() + "\n"
+      + "🟥".repeat(Math.ceil(reds/guesses.length*tot)) + " " + reds.toString();
+}
+
 //////////////////////////////////////////////////
 ////////// scoring functions
 //////////////////////////////////////////////////
@@ -130,6 +142,12 @@ let score = normalScore;
 // reveal the answer
 document.getElementsByClassName("btn")[2].addEventListener("click", e => {
     e.preventDefault();
+
+    document.getElementsByClassName("end-msg")[0].style["display"] = "block";
+    document.getElementsByClassName("end-msg")[0].innerHTML = fail(answer, guesses.length - hintCount, hintCount);
+    document.getElementsByClassName("end-msg")[0].innerHTML += "<div class=\"chart-wrapper\"><div class=\"chart\"></div></div>";
+    graph();
+
     guesses.unshift([answer, 100]);
     infobar();
     document.getElementsByClassName("message")[0].innerHTML = "<div>\n" + listEntry(answer, 100, true) + "\n</div>";
@@ -204,6 +222,11 @@ document.getElementsByTagName("form")[0].addEventListener('submit', async e => {
             document.getElementsByClassName("message")[0].innerHTML = "<div>\n" + listEntry(answer, 100, true) + "\n</div>";
             document.getElementsByClassName("btn")[2].disabled = true;
             document.getElementsByClassName("btn")[3].disabled = true;
+
+            document.getElementsByClassName("end-msg")[0].style["display"] = "block";
+            document.getElementsByClassName("end-msg")[0].innerHTML = success(guesses.length - hintCount, hintCount);
+            document.getElementsByClassName("end-msg")[0].innerHTML += "<div class=\"chart-wrapper\"><div class=\"chart\"></div></div>";
+            graph();
 
         // valid guess
         } else {

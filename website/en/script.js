@@ -2,11 +2,9 @@ const url = "http://localhost:8080/";
 
 const multiple = "Just type one word.";
 
-function already (word) {
-    return "The word <b>"
-         + word
-         + "</b> was already guessed.";
-}
+const already = word => 
+    "The word <b>" + word + "</b> was already guessed.";
+
 
 const loading = "<div class=\"loading-text\">"
               + "<span style=\"--i:  0;\" class=\"visible\">C</span>"
@@ -24,6 +22,19 @@ const loading = "<div class=\"loading-text\">"
               + "<span style=\"--i: 12;\" class=\"visible\">.</span>"
               + "<span style=\"--i: 13;\" class=\"visible\">.</span>"
               + "</div>";
+
+const success = (guesses, hints) =>
+    "<p class=\"bigger\"><span>Congrats!</span></p>\n"
+    + "<p><span>You got the</span> word <br>in <b>"
+    + guesses.toString()
+    + "</b> guesses"
+    + (hints ? " and <b>" + hints.toString() + "</b> hints.</p>\n" : ".\n");
+
+const fail = (word, guesses, hints) =>
+    "<p class=\"bigger\"><span>Better luck next time!</span></p>\n"
+    + "<p><span>You gave up in <b>" + guesses.toString() + "</b> guesses"
+    + (hints ? " and <b>" + hints.toString() + "</b> hints.</p>\n" : ".\n")
+    + "<p>The word was <b>" + word + "</b>.</p>\n";
 
 const counter = "Guesses:";
 const hinter = "Hints:";
