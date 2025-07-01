@@ -22,7 +22,8 @@ FROM alpine AS build
 RUN apk update && \
     apk add --no-cache \
     build-base \
-    boost-dev
+    boost-dev \
+    openssl-dev
 
 COPY --from=prebuild /KoreanWordVectorsDocker/src/*.o /server/
 COPY --from=prebuild /KoreanWordVectorsDocker/src/src/*.h /server/src/
@@ -41,7 +42,8 @@ FROM alpine
 RUN apk update && \
     apk add --no-cache \
     libstdc++ \
-    boost-url
+    boost-url \
+    openssl-libs-static
 
 RUN addgroup -S shs && adduser -S shs -G shs
 USER shs

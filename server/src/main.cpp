@@ -25,7 +25,7 @@ public:
     http_worker(http_worker const&) = delete;
     http_worker& operator=(http_worker const&) = delete;
 
-    http_worker(tcp::acceptor& acceptor, fasttext::FastText& fasttext) :
+    http_worker(tcp::acceptor& acceptor, std::unique_ptr<fasttext::FastText>& fasttext) :
         acceptor_(acceptor),
         fasttext_(fasttext)
     {}
@@ -43,7 +43,7 @@ private:
     tcp::acceptor& acceptor_;
 
     // The model that determines vector representations.
-    fasttext::FastText& fasttext_;
+    std::unique_ptr<fasttext::FastText>& fasttext_;
 
     // The socket for the currently connected client.
     tcp::socket socket_{acceptor_.get_executor()};
@@ -110,10 +110,7 @@ private:
             std::make_tuple(alloc_)
         );
 
-        http::async_read(
-            socket_,
-            buffer_,
-            *parser_,
+        http::async_read(socket_, buffer_, *parser_,
             [this](beast::error_code ec, std::size_t) {
                 if (ec)
                     accept();
@@ -148,16 +145,15 @@ private:
 
         string_response_->result(status);
         string_response_->keep_alive(false);
-        string_response_->set(http::field::server, "Beast");
+        string_response_->set(http::field::server, BOOST_BEAST_VERSION_STRING);
         string_response_->set(http::field::content_type, "text/plain");
+        string_response_->set(http::field::access_control_allow_origin, "*");
         string_response_->body() = error;
         string_response_->prepare_payload();
 
         string_serializer_.emplace(*string_response_);
 
-        http::async_write(
-            socket_,
-            *string_serializer_,
+        http::async_write(socket_, *string_serializer_,
             [this](beast::error_code ec, std::size_t) {
                 socket_.shutdown(tcp::socket::shutdown_send, ec);
                 string_serializer_.reset();
@@ -168,44 +164,50 @@ private:
     }
 
     void send_vector(beast::string_view encoded) {
-        encoded.remove_prefix(1); // remove leading /
-        boost::urls::decode_view ds( encoded );
+        try {
+            encoded.remove_prefix(1); // remove leading /
+            boost::urls::decode_view ds( encoded );
 
-        fasttext::Vector vec(fasttext_.getDimension());
-        fasttext_.getWordVector(vec, std::string(ds.begin(), ds.end()));
+            fasttext::Vector vec(fasttext_->getDimension());
+            fasttext_->getWordVector(vec, std::string(ds.begin(), ds.end()));
 
-        http::vector_body<std::byte>::value_type vector(
-            reinterpret_cast<std::byte*>(vec.data()),
-            reinterpret_cast<std::byte*>(vec.data())
-            + fasttext_.getDimension() * sizeof(fasttext::real)
-        );
+            http::vector_body<std::byte>::value_type vector(
+                reinterpret_cast<std::byte*>(vec.data()),
+                reinterpret_cast<std::byte*>(vec.data())
+                + fasttext_->getDimension() * sizeof(fasttext::real)
+            );
 
-        vector_response_.emplace(
-            std::piecewise_construct,
-            std::make_tuple(),
-            std::make_tuple(alloc_)
-        );
-        
-        vector_response_->result(http::status::ok);
-        vector_response_->keep_alive(false);
-        vector_response_->set(http::field::access_control_allow_origin, "*");
-        vector_response_->set(http::field::server, "Beast");
-        vector_response_->set(http::field::content_type, "application/octet-stream");
-        vector_response_->body() = std::move(vector);
-        vector_response_->prepare_payload();
+            vector_response_.emplace(
+                std::piecewise_construct,
+                std::make_tuple(),
+                std::make_tuple(alloc_)
+            );
+            
+            vector_response_->result(http::status::ok);
+            vector_response_->keep_alive(false);
+            vector_response_->set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            vector_response_->set(http::field::content_type, "application/octet-stream");
+            vector_response_->set(http::field::access_control_allow_origin, "*");
+            vector_response_->body() = std::move(vector);
+            vector_response_->prepare_payload();
 
-        vector_serializer_.emplace(*vector_response_);
+            vector_serializer_.emplace(*vector_response_);
 
-        http::async_write(
-            socket_,
-            *vector_serializer_,
-            [this](beast::error_code ec, std::size_t) {
-                socket_.shutdown(tcp::socket::shutdown_send, ec);
-                vector_serializer_.reset();
-                vector_response_.reset();
-                accept();
-            }
-        );
+            http::async_write(socket_, *vector_serializer_,
+                [this](beast::error_code ec, std::size_t) {
+                    socket_.shutdown(tcp::socket::shutdown_send, ec);
+                    vector_serializer_.reset();
+                    vector_response_.reset();
+                    accept();
+                }
+            );
+
+        } catch (const std::exception& e) {
+            return send_bad_response (
+                http::status::internal_server_error,
+                "FastText error: " + std::string(e.what()) + "\r\n"
+            );
+        }
     }
     
     void check_deadline() {
@@ -226,8 +228,12 @@ int main(int argc, char* argv[]) {
     try {
         net::io_context ioc{1};
         auto const address = net::ip::make_address("0.0.0.0");
+        tcp::acceptor acceptor[3] = {
+            {ioc, {address, 80}},
+            {ioc, {address, 81}},
+            {ioc, {address, 82}}
+        };
         
-        std::cout << "Loading FastText models" << std::endl;
         std::unique_ptr<fasttext::FastText> fasttext[3];
         fasttext[0] = std::make_unique<fasttext::FastText>();
         fasttext[0]->loadModel("/var/www/en.bin");
@@ -236,21 +242,16 @@ int main(int argc, char* argv[]) {
         fasttext[2] = std::make_unique<fasttext::FastText>();
         fasttext[2]->loadModel("/var/www/nl.bin");
 
-        std::cout << "Starting server" << std::endl;
-        tcp::acceptor acceptor[3] = {
-            {ioc, {address, 80}},
-            {ioc, {address, 81}},
-            {ioc, {address, 82}}
-        };
-
         std::list<http_worker> workers;
         for (int i = 0; i < 3; i++)
             for (int j = 0; j < 5; j++) {
-                workers.emplace_back(acceptor[i], *fasttext[i]);
+                workers.emplace_back(acceptor[i], fasttext[i]);
                 workers.back().start();
             }
-        
         ioc.run();
+
+        return EXIT_SUCCESS;
+
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
         return EXIT_FAILURE;

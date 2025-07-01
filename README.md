@@ -29,7 +29,7 @@ docker run \
 -p 8080-8082:80-82 \
 --mount type=bind,source=/absolute/path/to/model/files,target=/var/www \
 --memory="256m" \
---memory-swap="28g" \
+--memory-swap="27g" \
 -d semantle-server
 ```
 
