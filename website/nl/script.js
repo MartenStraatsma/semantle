@@ -1,4 +1,4 @@
-const url = "http://localhost:8082/";
+const url = "https://localhost:8082/";
 
 const multiple = "Typ maar één woord.";
 
