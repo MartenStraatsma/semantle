@@ -5,13 +5,16 @@ INCLUDES = -I.
 LDFLAGS = -lboost_url -lssl -lcrypto
 
 opt: CXXFLAGS += -O3 -funroll-loops -DNDEBUG
-opt: main
+opt: main_ssl
 
 coverage: CXXFLAGS += -O0 -fno-inline -fprofile-arcs --coverage
-coverage: main
+coverage: main_ssl
 
 debug: CXXFLAGS += -g -O0 -fno-inline
-debug: main
+debug: main_ssl
 
-main: src/main.cpp
-	$(CXX) $(CXXFLAGS) $(OBJS) src/main_ssl.cpp -o main $(LDFLAGS)
+main: src/main.cpp src/fields_alloc.hpp
+	$(CXX) $(CXXFLAGS) $(OBJS) src/main.cpp -o main -lboost_url
+
+main_ssl: src/main_ssl.cpp  src/fields_alloc.hpp src/server_certificate.hpp
+	$(CXX) $(CXXFLAGS) $(OBJS) src/main_ssl.cpp -o main_ssl $(LDFLAGS)
