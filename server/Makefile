@@ -17,4 +17,4 @@ main: src/main.cpp src/fields_alloc.hpp
 	$(CXX) $(CXXFLAGS) $(OBJS) src/main.cpp -o main -lboost_url
 
 main_ssl: src/main_ssl.cpp  src/fields_alloc.hpp src/server_certificate.hpp
-	$(CXX) $(CXXFLAGS) $(OBJS) src/main_ssl.cpp -o main_ssl $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) $(OBJS) src/main_ssl.cpp -o main $(LDFLAGS)

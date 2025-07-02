@@ -231,8 +231,9 @@ class http_worker : public std::enable_shared_from_this<http_worker> {
 
     void send_vector () {
         try {
-            parser_->get().target().remove_prefix(1); // remove leading /
-            boost::urls::decode_view ds( parser_->get().target() );
+            boost::string_view encoded = parser_->get().target();
+            encoded.remove_prefix(1); // remove leading /
+            boost::urls::decode_view ds( encoded );
 
             fasttext::Vector vec(fasttext_->getDimension());
             fasttext_->getWordVector(vec, std::string(ds.begin(), ds.end()));
